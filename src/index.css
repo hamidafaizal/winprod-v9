@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mengatur latar belakang gelap secara permanen */
+body {
+  background-image: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+}
