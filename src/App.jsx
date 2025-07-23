@@ -8,31 +8,44 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ManajemenPerangkat from './pages/ManajemenPerangkat';
-import DistribusiLink from './pages/DistribusiLink'; // Impor halaman baru
+import DistribusiLink from './pages/DistribusiLink';
 
 // Halaman PWA
 import PwaLayout from './pwa/PwaLayout';
 import PwaLogin from './pwa/PwaLogin';
 import PwaChat from './pwa/PwaChat';
 
-// Layout utama yang mencakup Sidebar dan konten utama
-function MainLayout() {
+// --- Komponen Baru untuk Routing Berdasarkan Domain ---
+function AppRouter() {
+  const hostname = window.location.hostname;
+
+  // Jika diakses dari subdomain pwa.
+  if (hostname.startsWith('pwa.')) {
+    return (
+      <Routes>
+        <Route path="/" element={<PwaLayout />}>
+          {/* Arahkan root dari subdomain ke PwaLogin */}
+          <Route index element={<PwaLogin />} />
+          <Route path="login" element={<PwaLogin />} />
+          <Route path="chat" element={<PwaChat />} />
+        </Route>
+      </Routes>
+    );
+  }
+
+  // Jika tidak, tampilkan dashboard utama (domain utama)
+  return <DashboardApp />;
+}
+
+
+// --- Layout Dashboard Utama ---
+function MainLayout({ onLogout }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const navigate = useNavigate();
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
   
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error("Error logging out:", error.message);
-    } else {
-      navigate('/login');
-    }
-  };
-
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) setIsSidebarOpen(false);
@@ -48,65 +61,77 @@ function MainLayout() {
       <Sidebar 
         isOpen={isSidebarOpen} 
         toggle={toggleSidebar}
-        onLogout={handleLogout}
+        onLogout={onLogout}
       />
       <main className="flex-1 transition-all duration-300">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/devices" element={<ManajemenPerangkat />} />
-          <Route path="/links" element={<DistribusiLink />} /> {/* Daftarkan rute baru */}
+          <Route path="/links" element={<DistribusiLink />} />
         </Routes>
       </main>
     </div>
   );
 }
 
-function App() {
+
+// --- Aplikasi Dashboard (Logika Sesi) ---
+function DashboardApp() {
   const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
-    });
+      setLoading(false);
+    };
+    getSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    const isPwaRoute = location.pathname.startsWith('/pwa');
-    if (isPwaRoute) {
-      return; 
-    }
+    if (loading) return;
 
-    if (!session && !['/login', '/register'].includes(location.pathname)) {
+    const authRoutes = ['/login', '/register'];
+    const isAuthRoute = authRoutes.includes(location.pathname);
+
+    if (!session && !isAuthRoute) {
       navigate('/login');
-    } else if (session && ['/login', '/register'].includes(location.pathname)) {
+    } else if (session && isAuthRoute) {
       navigate('/');
     }
-  }, [session, navigate, location.pathname]);
+  }, [session, loading, navigate, location.pathname]);
 
-  if (session === null && !['/login', '/register'].includes(location.pathname) && !location.pathname.startsWith('/pwa')) {
-    return null;
+  if (loading) {
+    return null; // Atau tampilkan loading spinner
   }
 
   return (
     <Routes>
-      {/* Rute untuk PWA (tidak memerlukan sesi user) */}
-      <Route path="/pwa" element={<PwaLayout />}>
-        <Route path="login" element={<PwaLogin />} />
-        <Route path="chat" element={<PwaChat />} />
-      </Route>
-
-      {/* Rute untuk Dashboard Utama */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/*" element={session ? <MainLayout /> : null} />
+      <Route path="/*" element={session ? <MainLayout onLogout={handleLogout} /> : null} />
     </Routes>
   );
+}
+
+
+// --- Komponen App Utama ---
+function App() {
+  return <AppRouter />;
 }
 
 export default App;

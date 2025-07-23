@@ -18,16 +18,17 @@ export default defineConfig({
         theme_color: '#1f2937',
         background_color: '#1f2937',
         display: 'standalone',
-        scope: '/pwa/',
-        start_url: '/pwa/login',
+        // Mengubah scope dan start_url untuk subdomain
+        scope: '/',
+        start_url: '/',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'pwa-192x192.png', // Pastikan ikon ada di folder /public
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'pwa-512x512.png', // Pastikan ikon ada di folder /public
             sizes: '512x512',
             type: 'image/png'
           },
