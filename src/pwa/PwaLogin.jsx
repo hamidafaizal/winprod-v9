@@ -1,0 +1,85 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabaseClient';
+
+function PwaLogin() {
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    console.log("PwaLogin.jsx: handleLogin started.");
+    setLoading(true);
+    setError(null);
+
+    if (!code.trim()) {
+      setError("Kode verifikasi tidak boleh kosong.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Cari perangkat berdasarkan kode verifikasi
+      const { data, error: fetchError } = await supabase
+        .from('devices')
+        .select('id, device_name')
+        .eq('verification_code', code.trim())
+        .single();
+
+      if (fetchError || !data) {
+        throw new Error("Kode verifikasi tidak valid atau tidak ditemukan.");
+      }
+
+      // Simpan informasi perangkat di localStorage sebagai "sesi"
+      localStorage.setItem('pwa_device_id', data.id);
+      localStorage.setItem('pwa_device_name', data.device_name);
+      console.log("PwaLogin.jsx: Login successful for device:", data.device_name);
+
+      // Arahkan ke halaman chat PWA
+      navigate('/pwa/chat');
+
+    } catch (error) {
+      console.error("PwaLogin.jsx: Error during PWA login:", error.message);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-900">
+      <div className="w-full max-w-sm p-8 space-y-6 bg-gray-800 rounded-lg shadow-md">
+        <h1 className="text-2xl font-bold text-center text-white">Verifikasi Perangkat</h1>
+        <p className="text-center text-sm text-gray-400">
+          Masukkan kode verifikasi dari dashboard untuk menghubungkan perangkat ini.
+        </p>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label htmlFor="verificationCode" className="sr-only">Kode Verifikasi</label>
+            <input
+              type="text"
+              id="verificationCode"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="XXXX-XXXX-XXXX-XXXX"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Memverifikasi...' : 'Hubungkan Perangkat'}
+          </button>
+          {error && <p className="text-sm text-center text-red-400">{error}</p>}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default PwaLogin;

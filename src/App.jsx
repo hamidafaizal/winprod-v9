@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabaseClient';
+
+// Halaman Dashboard Utama
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ManajemenPerangkat from './pages/ManajemenPerangkat';
+import DistribusiLink from './pages/DistribusiLink'; // Impor halaman baru
+
+// Halaman PWA
+import PwaLayout from './pwa/PwaLayout';
+import PwaLogin from './pwa/PwaLogin';
+import PwaChat from './pwa/PwaChat';
 
 // Layout utama yang mencakup Sidebar dan konten utama
 function MainLayout() {
@@ -13,35 +22,25 @@ function MainLayout() {
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
-    console.log("App.jsx (MainLayout): Sidebar toggled, new state:", !isSidebarOpen);
   };
   
   const handleLogout = async () => {
-    console.log("App.jsx (MainLayout): handleLogout initiated.");
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("Error logging out:", error.message);
     } else {
-      console.log("App.jsx (MainLayout): Logout successful.");
-      navigate('/login'); // Arahkan ke halaman login setelah logout
+      navigate('/login');
     }
   };
 
   useEffect(() => {
-    console.log("App.jsx (MainLayout): useEffect for resize listener is running");
     const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
-      } else {
-        setIsSidebarOpen(true);
-      }
+      if (window.innerWidth < 768) setIsSidebarOpen(false);
+      else setIsSidebarOpen(true);
     };
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => {
-      console.log("App.jsx (MainLayout): Cleaning up resize listener");
-      window.removeEventListener('resize', handleResize);
-    };
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return (
@@ -54,13 +53,13 @@ function MainLayout() {
       <main className="flex-1 transition-all duration-300">
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          {/* Tambahkan rute lain untuk layout utama di sini */}
+          <Route path="/devices" element={<ManajemenPerangkat />} />
+          <Route path="/links" element={<DistribusiLink />} /> {/* Daftarkan rute baru */}
         </Routes>
       </main>
     </div>
   );
 }
-
 
 function App() {
   const [session, setSession] = useState(null);
@@ -68,43 +67,41 @@ function App() {
   const location = useLocation();
 
   useEffect(() => {
-    console.log("App.jsx: useEffect for auth state change is running.");
-    // Cek sesi yang sudah ada
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      console.log("App.jsx: Initial session check:", session);
     });
-
-    // Dengarkan perubahan status otentikasi
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("App.jsx: Auth state changed, new session:", session);
       setSession(session);
     });
-
-    return () => {
-      console.log("App.jsx: Cleaning up auth state change subscription.");
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    console.log("App.jsx: useEffect for navigation is running. Session:", session);
+    const isPwaRoute = location.pathname.startsWith('/pwa');
+    if (isPwaRoute) {
+      return; 
+    }
+
     if (!session && !['/login', '/register'].includes(location.pathname)) {
-      console.log("App.jsx: No session, navigating to /login");
       navigate('/login');
     } else if (session && ['/login', '/register'].includes(location.pathname)) {
-      console.log("App.jsx: Session found, navigating to /");
       navigate('/');
     }
   }, [session, navigate, location.pathname]);
 
-  // Tampilkan loading atau null selama sesi sedang diperiksa untuk pertama kali
-  if (session === null && !['/login', '/register'].includes(location.pathname)) {
-    return null; // Atau tampilkan komponen loading
+  if (session === null && !['/login', '/register'].includes(location.pathname) && !location.pathname.startsWith('/pwa')) {
+    return null;
   }
 
   return (
     <Routes>
+      {/* Rute untuk PWA (tidak memerlukan sesi user) */}
+      <Route path="/pwa" element={<PwaLayout />}>
+        <Route path="login" element={<PwaLogin />} />
+        <Route path="chat" element={<PwaChat />} />
+      </Route>
+
+      {/* Rute untuk Dashboard Utama */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/*" element={session ? <MainLayout /> : null} />

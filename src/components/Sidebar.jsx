@@ -1,8 +1,30 @@
 import React from 'react';
+import { useLocation, Link } from 'react-router-dom';
+import { FaHome, FaServer, FaLink } from 'react-icons/fa'; // Menambahkan FaLink
 
 // Sidebar dengan tema gelap permanen.
 function Sidebar({ isOpen, toggle, onLogout }) {
   console.log("Component: Rendering Sidebar, isOpen:", isOpen);
+  const location = useLocation();
+  const currentPath = location.pathname;
+
+  const navItems = [
+    {
+      href: '/',
+      label: 'Dashboard',
+      icon: <FaHome className="h-6 w-6 flex-shrink-0" />,
+    },
+    {
+      href: '/devices',
+      label: 'Manajemen Perangkat',
+      icon: <FaServer className="h-6 w-6 flex-shrink-0" />,
+    },
+    {
+      href: '/links', // URL untuk halaman baru
+      label: 'Distribusi Link',
+      icon: <FaLink className="h-6 w-6 flex-shrink-0" />, // Ikon baru
+    },
+  ];
 
   return (
     <aside className={`
@@ -57,29 +79,30 @@ function Sidebar({ isOpen, toggle, onLogout }) {
 
         {/* Menu Navigasi */}
         <nav>
-          <ul>
-            <li>
-              <a 
-                href="/" 
-                className={`
-                  flex items-center p-3 rounded-lg font-semibold 
-                  text-gray-200
-                  bg-gray-700/50
-                  hover:bg-gray-600/60
-                  transition-colors duration-200 overflow-hidden
-                  ${!isOpen && 'justify-center'}
-                `}>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                <span className={`
-                  transition-all duration-200
-                  ${isOpen ? 'ml-4' : 'w-0 opacity-0'}
-                `}>
-                  Dashboard
-                </span>
-              </a>
-            </li>
+          <ul className="space-y-2">
+            {navItems.map((item) => (
+              <li key={item.href}>
+                <Link 
+                  to={item.href} 
+                  className={`
+                    flex items-center p-3 rounded-lg font-semibold 
+                    transition-colors duration-200 overflow-hidden
+                    ${currentPath === item.href 
+                      ? 'bg-gray-700/50 text-white' 
+                      : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'
+                    }
+                    ${!isOpen && 'justify-center'}
+                  `}>
+                  {item.icon}
+                  <span className={`
+                    transition-all duration-200
+                    ${isOpen ? 'ml-4' : 'w-0 opacity-0'}
+                  `}>
+                    {item.label}
+                  </span>
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
       </div>
