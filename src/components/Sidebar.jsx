@@ -1,13 +1,15 @@
 import React from 'react';
 
 // Sidebar dengan tema gelap permanen.
-function Sidebar({ isOpen, toggle }) {
+function Sidebar({ isOpen, toggle, onLogout }) {
   console.log("Component: Rendering Sidebar, isOpen:", isOpen);
 
   return (
     <aside className={`
       relative
       h-screen 
+      flex
+      flex-col
       flex-shrink-0 
       bg-gray-800/30
       backdrop-blur-xl 
@@ -44,40 +46,66 @@ function Sidebar({ isOpen, toggle }) {
         </svg>
       </button>
 
-      {/* Judul Aplikasi */}
-      <div className={`mb-10 flex items-center h-[52px]`}>
-        <h2 className={`text-2xl font-bold text-gray-100 transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
-          App
-        </h2>
-      </div>
+      {/* Konten Atas (Judul & Navigasi) */}
+      <div className="flex-grow">
+        {/* Judul Aplikasi */}
+        <div className={`mb-10 flex items-center h-[52px]`}>
+          <h2 className={`text-2xl font-bold text-gray-100 transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
+            App
+          </h2>
+        </div>
 
-      {/* Menu Navigasi */}
-      <nav>
-        <ul>
-          <li>
-            <a 
-              href="#" 
-              className={`
-                flex items-center p-3 rounded-lg font-semibold 
-                text-gray-200
-                bg-gray-700/50
-                hover:bg-gray-600/60
-                transition-colors duration-200 overflow-hidden
-                ${!isOpen && 'justify-center'}
-              `}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              <span className={`
-                transition-all duration-200
-                ${isOpen ? 'ml-4' : 'w-0 opacity-0'}
-              `}>
-                Dashboard
-              </span>
-            </a>
-          </li>
-        </ul>
-      </nav>
+        {/* Menu Navigasi */}
+        <nav>
+          <ul>
+            <li>
+              <a 
+                href="/" 
+                className={`
+                  flex items-center p-3 rounded-lg font-semibold 
+                  text-gray-200
+                  bg-gray-700/50
+                  hover:bg-gray-600/60
+                  transition-colors duration-200 overflow-hidden
+                  ${!isOpen && 'justify-center'}
+                `}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span className={`
+                  transition-all duration-200
+                  ${isOpen ? 'ml-4' : 'w-0 opacity-0'}
+                `}>
+                  Dashboard
+                </span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      
+      {/* Konten Bawah (Tombol Logout) */}
+      <div>
+        <button 
+          onClick={onLogout}
+          className={`
+            flex items-center p-3 rounded-lg font-semibold w-full
+            text-gray-200
+            hover:bg-red-500/30
+            transition-colors duration-200 overflow-hidden
+            ${!isOpen && 'justify-center'}
+          `}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span className={`
+            transition-all duration-200
+            ${isOpen ? 'ml-4' : 'w-0 opacity-0'}
+          `}>
+            Logout
+          </span>
+        </button>
+      </div>
     </aside>
   );
 }
