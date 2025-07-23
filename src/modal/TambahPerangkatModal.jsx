@@ -2,14 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { FaTimes, FaCopy } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient';
 
-// Fungsi untuk menghasilkan kode verifikasi acak
+// Fungsi untuk menghasilkan kode verifikasi 6 digit angka
 const generateCode = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let result = '';
-  for (let i = 0; i < 4; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 // Komponen Modal untuk menambah perangkat baru
@@ -24,15 +19,18 @@ function TambahPerangkatModal({ isOpen, onClose, onSaveSuccess }) {
   // Generate kode baru setiap kali modal dibuka
   useEffect(() => {
     if (isOpen) {
-      const newCode = `${generateCode()}-${generateCode()}-${generateCode()}-${generateCode()}`;
+      const newCode = generateCode();
       setVerificationCode(newCode);
-      console.log("TambahPerangkatModal.jsx: New verification code generated:", newCode);
+      setDeviceName(''); // Reset nama perangkat
+      setError(null); // Reset error
+      console.log("TambahPerangkatModal.jsx: New 6-digit verification code generated:", newCode);
     }
   }, [isOpen]);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(verificationCode);
     console.log("Copied to clipboard:", verificationCode);
+    // Anda bisa menambahkan notifikasi "Tersalin!" di sini
   };
 
   const handleSave = async () => {
@@ -47,12 +45,9 @@ function TambahPerangkatModal({ isOpen, onClose, onSaveSuccess }) {
     setLoading(true);
 
     try {
-      // 1. Dapatkan user yang sedang login
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User tidak ditemukan. Silakan login kembali.");
 
-      // 2. Simpan data ke tabel 'devices'
       const { error: insertError } = await supabase
         .from('devices')
         .insert({
@@ -62,16 +57,15 @@ function TambahPerangkatModal({ isOpen, onClose, onSaveSuccess }) {
         });
 
       if (insertError) {
-        // Cek jika error karena kode verifikasi duplikat
-        if (insertError.code === '23505') { // Kode error untuk unique violation
-          throw new Error("Gagal menyimpan: Kode verifikasi sudah ada. Coba lagi.");
+        if (insertError.code === '23505') {
+          throw new Error("Gagal menyimpan: Kode verifikasi sudah ada. Coba buat lagi.");
         }
         throw insertError;
       }
 
       console.log("TambahPerangkatModal.jsx: Device saved successfully.");
-      onSaveSuccess(); // Panggil fungsi untuk refresh data di halaman utama
-      onClose(); // Tutup modal
+      onSaveSuccess();
+      onClose();
 
     } catch (error) {
       console.error("TambahPerangkatModal.jsx: Error saving device:", error.message);
@@ -106,15 +100,15 @@ function TambahPerangkatModal({ isOpen, onClose, onSaveSuccess }) {
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
               className="w-full px-4 py-3 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Masukkan nama HP"
+              placeholder="Contoh: HP Samsung A52"
             />
           </div>
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-300">
-              Kode Verifikasi
+              Kode Verifikasi (6 Digit)
             </label>
             <div className="flex items-center justify-between p-4 bg-gray-900 rounded-md">
-              <span className="font-mono text-lg tracking-widest text-green-400">
+              <span className="font-mono text-2xl tracking-widest text-green-400">
                 {verificationCode}
               </span>
               <button onClick={handleCopyCode} className="text-gray-400 hover:text-white" title="Salin Kode">
@@ -122,7 +116,7 @@ function TambahPerangkatModal({ isOpen, onClose, onSaveSuccess }) {
               </button>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              Masukkan kode ini di aplikasi pada perangkat HP Anda untuk menghubungkannya.
+              Masukkan 6 digit kode ini di aplikasi pada perangkat HP Anda.
             </p>
           </div>
           {error && <p className="text-sm text-center text-red-400 mt-4">{error}</p>}

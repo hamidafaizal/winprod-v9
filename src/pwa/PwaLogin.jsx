@@ -14,14 +14,13 @@ function PwaLogin() {
     setLoading(true);
     setError(null);
 
-    if (!code.trim()) {
-      setError("Kode verifikasi tidak boleh kosong.");
+    if (!code.trim() || code.trim().length !== 6) {
+      setError("Kode verifikasi harus 6 digit angka.");
       setLoading(false);
       return;
     }
 
     try {
-      // Cari perangkat berdasarkan kode verifikasi
       const { data, error: fetchError } = await supabase
         .from('devices')
         .select('id, device_name')
@@ -32,13 +31,11 @@ function PwaLogin() {
         throw new Error("Kode verifikasi tidak valid atau tidak ditemukan.");
       }
 
-      // Simpan informasi perangkat di localStorage sebagai "sesi"
       localStorage.setItem('pwa_device_id', data.id);
       localStorage.setItem('pwa_device_name', data.device_name);
       console.log("PwaLogin.jsx: Login successful for device:", data.device_name);
 
-      // Arahkan ke halaman chat PWA
-      navigate('/pwa/chat');
+      navigate('/chat'); // Arahkan ke /chat setelah login
 
     } catch (error) {
       console.error("PwaLogin.jsx: Error during PWA login:", error.message);
@@ -53,18 +50,20 @@ function PwaLogin() {
       <div className="w-full max-w-sm p-8 space-y-6 bg-gray-800 rounded-lg shadow-md">
         <h1 className="text-2xl font-bold text-center text-white">Verifikasi Perangkat</h1>
         <p className="text-center text-sm text-gray-400">
-          Masukkan kode verifikasi dari dashboard untuk menghubungkan perangkat ini.
+          Masukkan 6 digit kode verifikasi dari dashboard Anda.
         </p>
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label htmlFor="verificationCode" className="sr-only">Kode Verifikasi</label>
             <input
-              type="text"
+              // Menggunakan type="tel" untuk memunculkan keypad numerik di HP
+              type="tel"
               id="verificationCode"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="XXXX-XXXX-XXXX-XXXX"
+              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))} // Hanya izinkan angka
+              maxLength="6"
+              className="w-full px-4 py-3 text-center text-3xl font-semibold tracking-[.2em] text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="123456"
               required
             />
           </div>
