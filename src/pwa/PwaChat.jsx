@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCopy, FaSignOutAlt, FaTrash } from 'react-icons/fa';
+import { FaCopy, FaSignOutAlt, FaTrash, FaSpinner } from 'react-icons/fa'; // FaSpinner ditambahkan
 import { supabase } from '../lib/supabaseClient';
 
 function PwaChat() {
   const [deviceName, setDeviceName] = useState('');
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null); // State untuk melacak pesan yang sedang dihapus
   const navigate = useNavigate();
   const mainContentRef = useRef(null);
-  const pollIntervalRef = useRef(null); // Ref untuk menyimpan ID interval
+  const pollIntervalRef = useRef(null);
 
   const handleLogout = useCallback(() => {
     console.log("PwaChat.jsx: Logging out.");
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
     localStorage.removeItem('pwa_device_id');
     localStorage.removeItem('pwa_device_name');
     navigate('/pwa/login');
@@ -22,6 +26,38 @@ function PwaChat() {
     if (mainContentRef.current) {
       mainContentRef.current.scrollTop = mainContentRef.current.scrollHeight;
     }
+  };
+
+  const fetchMessages = useCallback(async () => {
+    const deviceId = localStorage.getItem('pwa_device_id');
+    if (!deviceId) return;
+
+    console.log("PwaChat.jsx: Polling for messages for device ID:", deviceId);
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('device_id', deviceId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error("PwaChat.jsx: Error polling messages:", error.message);
+    } else if (data) {
+      setMessages(data);
+    }
+    
+    if (loading) setLoading(false);
+  }, [loading]);
+
+  const startPolling = useCallback(() => {
+    // Pastikan tidak ada interval ganda
+    clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(fetchMessages, 3000);
+    console.log("PwaChat.jsx: Polling resumed.");
+  }, [fetchMessages]);
+
+  const stopPolling = () => {
+    clearInterval(pollIntervalRef.current);
+    console.log("PwaChat.jsx: Polling paused.");
   };
 
   useEffect(() => {
@@ -35,48 +71,27 @@ function PwaChat() {
     
     setDeviceName(name);
 
-    const fetchMessages = async () => {
-      console.log("PwaChat.jsx: Polling for messages for device ID:", deviceId);
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('device_id', deviceId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error("PwaChat.jsx: Error polling messages:", error.message);
-      } else {
-        setMessages(prevMessages => {
-          const prevIds = new Set(prevMessages.map(m => m.id));
-          const newIds = new Set(data.map(m => m.id));
-          
-          if (prevIds.size === newIds.size && [...prevIds].every(id => newIds.has(id))) {
-            return prevMessages;
-          }
-          return data;
-        });
-      }
-      if (loading) setLoading(false);
-    };
-
     fetchMessages();
-    // Simpan ID interval ke ref agar bisa diakses di fungsi lain
-    pollIntervalRef.current = setInterval(fetchMessages, 3000);
+    startPolling();
 
     const deleteChannel = supabase.channel('device-deletions')
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'devices', filter: `id=eq.${deviceId}` },
-        () => handleLogout()
+        () => {
+          console.log("PwaChat.jsx: Device deleted event received, logging out.");
+          alert('Perangkat ini telah dihapus dari dashboard. Anda akan dikeluarkan.');
+          handleLogout();
+        }
       )
       .subscribe();
 
     return () => {
-      console.log("PwaChat.jsx: Clearing poll interval and unsubscribing.");
+      console.log("PwaChat.jsx: Cleanup on unmount.");
       clearInterval(pollIntervalRef.current);
       supabase.removeChannel(deleteChannel);
     };
-  }, [handleLogout, loading]);
+  }, [fetchMessages, handleLogout, startPolling]);
 
   useEffect(() => {
     scrollToBottom();
@@ -84,67 +99,65 @@ function PwaChat() {
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
+    // Anda bisa menambahkan notifikasi "Tersalin!" di sini jika mau
   };
 
   const handleDeleteMessage = async (messageId) => {
-    console.log("PwaChat.jsx: Deleting message with ID:", messageId);
+    // Konfirmasi sebelum menghapus
+    if (!window.confirm("Apakah Anda yakin ingin menghapus pesan ini?")) {
+      return;
+    }
     
-    // 1. Hentikan polling sementara
-    clearInterval(pollIntervalRef.current);
-    console.log("PwaChat.jsx: Polling paused.");
+    stopPolling();
+    setDeletingId(messageId); // Tampilkan indikator loading untuk pesan spesifik
 
-    // 2. Update UI secara optimis
-    setMessages(currentMessages => currentMessages.filter(msg => msg.id !== messageId));
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId);
 
-    // 3. Hapus dari DB
-    const { error } = await supabase.from('messages').delete().eq('id', messageId);
+    setDeletingId(null); // Hentikan loading
 
     if (error) {
       console.error("PwaChat.jsx: Error deleting message:", error.message);
-      alert("Gagal menghapus pesan. Memuat ulang daftar pesan.");
-      // Jika gagal, fetch ulang untuk sinkronisasi
-      const deviceId = localStorage.getItem('pwa_device_id');
-      const { data } = await supabase.from('messages').select('*').eq('device_id', deviceId).order('created_at', { ascending: true });
-      setMessages(data || []);
+      alert(`Gagal menghapus pesan: ${error.message}`);
     } else {
       console.log("PwaChat.jsx: Message successfully deleted from DB.");
+      // Hapus pesan dari state secara manual agar UI update lebih cepat
+      setMessages(currentMessages => currentMessages.filter(msg => msg.id !== messageId));
     }
 
-    // 4. Mulai lagi polling setelah proses selesai
-    const deviceId = localStorage.getItem('pwa_device_id');
-    const fetchMessages = async () => {
-        const { data } = await supabase.from('messages').select('*').eq('device_id', deviceId).order('created_at', { ascending: true });
-        setMessages(data || []);
-    };
-    pollIntervalRef.current = setInterval(fetchMessages, 3000);
-    console.log("PwaChat.jsx: Polling resumed.");
+    startPolling();
   };
   
   const handleDeleteAll = async () => {
     const deviceId = localStorage.getItem('pwa_device_id');
-    if (!window.confirm("Apakah Anda yakin ingin menghapus semua pesan?")) return;
-    
-    // Hentikan polling sementara
-    clearInterval(pollIntervalRef.current);
-    console.log("PwaChat.jsx: Polling paused for Delete All.");
+    if (!deviceId) return;
 
-    console.log("PwaChat.jsx: Deleting all messages for device ID:", deviceId);
-    const { error } = await supabase.from('messages').delete().eq('device_id', deviceId);
+    if (!window.confirm("Apakah Anda yakin ingin menghapus SEMUA pesan? Tindakan ini tidak dapat dibatalkan.")) {
+      return;
+    }
+    
+    stopPolling();
+    setLoading(true); // Gunakan loading global untuk proses ini
+
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('device_id', deviceId);
     
     if (error) {
-      console.error("PwaChat.jsx: Error deleting messages:", error.message);
-      alert("Gagal menghapus pesan.");
+      console.error("PwaChat.jsx: Error deleting all messages:", error.message);
+      alert(`Gagal menghapus semua pesan: ${error.message}`);
+      // Jika gagal, fetch ulang data untuk sinkronisasi
+      await fetchMessages();
     } else {
+      console.log("PwaChat.jsx: All messages deleted successfully.");
       setMessages([]);
     }
 
-    // Mulai lagi polling
-    const fetchMessages = async () => {
-        const { data } = await supabase.from('messages').select('*').eq('device_id', deviceId).order('created_at', { ascending: true });
-        setMessages(data || []);
-    };
-    pollIntervalRef.current = setInterval(fetchMessages, 3000);
-    console.log("PwaChat.jsx: Polling resumed after Delete All.");
+    setLoading(false);
+    startPolling();
   };
 
   return (
@@ -157,8 +170,10 @@ function PwaChat() {
       </header>
 
       <main ref={mainContentRef} className="flex-1 p-4 overflow-y-auto space-y-4">
-        {loading ? (
-          <p className="text-center text-gray-400">Memuat pesan...</p>
+        {loading && messages.length === 0 ? (
+          <div className="flex justify-center items-center h-full">
+            <FaSpinner className="animate-spin text-4xl text-gray-400" />
+          </div>
         ) : messages.length === 0 ? (
           <p className="text-center text-gray-500">Belum ada pesan.</p>
         ) : (
@@ -169,17 +184,18 @@ function PwaChat() {
                 <div className="absolute top-1 right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={() => handleCopy(msg.content)}
-                    className="p-1 rounded-full bg-gray-600 text-gray-300"
+                    className="p-1 rounded-full bg-gray-600 hover:bg-gray-500 text-gray-300"
                     title="Salin Pesan"
                   >
                     <FaCopy size={12} />
                   </button>
                   <button 
                     onClick={() => handleDeleteMessage(msg.id)}
-                    className="p-1 rounded-full bg-red-800/70 text-red-300"
+                    disabled={deletingId === msg.id}
+                    className="p-1 rounded-full bg-red-800/70 hover:bg-red-700/70 text-red-300 disabled:opacity-50"
                     title="Hapus Pesan"
                   >
-                    <FaTrash size={12} />
+                    {deletingId === msg.id ? <FaSpinner className="animate-spin" size={12} /> : <FaTrash size={12} />}
                   </button>
                 </div>
               </div>
@@ -191,9 +207,10 @@ function PwaChat() {
       <footer className="p-4 bg-gray-800">
         <button 
           onClick={handleDeleteAll}
-          className="w-full flex items-center justify-center py-2 px-4 font-semibold text-white bg-red-600/80 rounded-lg hover:bg-red-700/80"
+          disabled={loading || messages.length === 0}
+          className="w-full flex items-center justify-center py-2 px-4 font-semibold text-white bg-red-600/80 rounded-lg hover:bg-red-700/80 disabled:bg-red-800/50 disabled:cursor-not-allowed"
         >
-          <FaTrash className="mr-2" />
+          {loading ? <FaSpinner className="animate-spin mr-2" /> : <FaTrash className="mr-2" />}
           Hapus Semua Pesan
         </button>
       </footer>
