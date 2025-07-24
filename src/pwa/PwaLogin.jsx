@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
@@ -7,6 +7,17 @@ function PwaLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    console.log("PwaLogin.jsx: Checking for existing session on component mount.");
+    const deviceId = localStorage.getItem('pwa_device_id');
+    if (deviceId) {
+      console.log("PwaLogin.jsx: Found existing deviceId, navigating to /chat.");
+      navigate('/chat');
+    } else {
+      console.log("PwaLogin.jsx: No existing deviceId found, staying on login page.");
+    }
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
