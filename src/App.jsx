@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ManajemenPerangkat from './pages/ManajemenPerangkat';
 import DistribusiLink from './pages/DistribusiLink';
+import Riset from './pages/Riset';
 
 // Halaman PWA
 import PwaLayout from './pwa/PwaLayout';
@@ -19,12 +20,10 @@ import PwaChat from './pwa/PwaChat';
 function AppRouter() {
   const hostname = window.location.hostname;
 
-  // Jika diakses dari subdomain pwa.
   if (hostname.startsWith('pwa.')) {
     return (
       <Routes>
         <Route path="/" element={<PwaLayout />}>
-          {/* Arahkan root dari subdomain ke PwaLogin */}
           <Route index element={<PwaLogin />} />
           <Route path="login" element={<PwaLogin />} />
           <Route path="chat" element={<PwaChat />} />
@@ -33,7 +32,6 @@ function AppRouter() {
     );
   }
 
-  // Jika tidak, tampilkan dashboard utama (domain utama)
   return <DashboardApp />;
 }
 
@@ -57,17 +55,20 @@ function MainLayout({ onLogout }) {
   }, []);
 
   return (
-    <div className="flex w-full min-h-screen bg-gray-900">
+    // Perubahan di sini: Mengatur tinggi layar penuh dan menyembunyikan overflow
+    <div className="flex w-full h-screen bg-gray-900 overflow-hidden">
       <Sidebar 
         isOpen={isSidebarOpen} 
         toggle={toggleSidebar}
         onLogout={onLogout}
       />
-      <main className="flex-1 transition-all duration-300">
+      {/* Perubahan di sini: Menambahkan overflow-y-auto agar hanya area ini yang scroll */}
+      <main className="flex-1 transition-all duration-300 overflow-y-auto">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/devices" element={<ManajemenPerangkat />} />
           <Route path="/links" element={<DistribusiLink />} />
+          <Route path="/riset" element={<Riset />} />
         </Routes>
       </main>
     </div>
@@ -116,7 +117,7 @@ function DashboardApp() {
   }, [session, loading, navigate, location.pathname]);
 
   if (loading) {
-    return null; // Atau tampilkan loading spinner
+    return null;
   }
 
   return (
